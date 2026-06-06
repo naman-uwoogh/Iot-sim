@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<meta name="theme-color" content="#0f1117"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<title>IoT Publisher</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.3.4/mqtt.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0f1117;--surface:#1a1d27;--surface2:#22263a;
+  --border:rgba(255,255,255,0.08);--text:#e8eaf0;--muted:#8890a8;
+  --accent:#00d4aa;--warn:#f59e0b;--danger:#ef4444;--r:14px;
+}
+html,body{background:var(--bg);color:var(--text);min-height:100vh;
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  font-size:15px;-webkit-font-smoothing:antialiased}
+
+nav{position:sticky;top:0;z-index:100;background:rgba(15,17,23,0.92);
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border);
+  padding:max(12px,env(safe-area-inset-top)) 16px 12px;
+  display:flex;align-items:center;justify-content:space-between;}
+.logo{font-size:17px;font-weight:700;letter-spacing:-0.5px}
+.logo span{color:var(--accent)}
+.conn-pill{display:flex;align-items:center;gap:6px;padding:5px 12px;
+  border-radius:20px;font-size:12px;font-weight:500;border:1px solid var(--border);
+  background:var(--surface2);transition:all .3s;}
+.conn-pill.on{background:rgba(0,212,170,0.12);color:var(--accent);border-color:rgba(0,212,170,0.3)}
+.conn-pill.err{background:rgba(239,68,68,0.1);color:var(--danger);border-color:rgba(239,68,68,0.3)}
+.cdot{width:7px;height:7px;border-radius:50%;background:currentColor;flex-shrink:0}
+
+main{padding:16px;max-width:540px;margin:0 auto}
+
+/* Config card */
+.card{background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--r);padding:18px;margin-bottom:14px;}
+.card-title{font-size:13px;font-weight:600;letter-spacing:.04em;
+  text-transform:uppercase;color:var(--muted);margin-bottom:14px;}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.row.single{grid-template-columns:1fr}
+.field label{display:block;font-size:11px;font-weight:600;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--muted);margin-bottom:5px}
+.field input{width:100%;padding:9px 11px;background:var(--surface2);
+  border:1px solid var(--border);border-radius:9px;color:var(--text);
+  font-size:13px;font-family:inherit;outline:none;transition:border-color .2s;}
+.field input:focus{border-color:var(--accent)}
+.field input::placeholder{color:var(--muted)}
+.btn{width:100%;padding:11px;border-radius:10px;font-size:14px;font-weight:600;
+  border:none;cursor:pointer;transition:.2s;font-family:inherit;margin-top:4px;}
+.btn-connect{background:var(--accent);color:#0f1117}
+.btn-connect:hover{opacity:.88}
+.btn-connect:disabled{opacity:.4;cursor:not-allowed}
+.btn-disconnect{background:var(--surface2);color:var(--danger);border:1px solid rgba(239,68,68,.3)}
+
+/* Topic prefix + X display */
+.topic-preview{background:var(--surface2);border-radius:8px;padding:10px 12px;
+  font-size:12px;color:var(--muted);margin-top:10px;line-height:1.8}
+.topic-preview b{color:var(--accent)}
+.topic-preview .x{color:var(--warn)}
+
+/* Devices */
+.dev-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.dev-header h2{font-size:15px;font-weight:600}
+.interval-row{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+.interval-row input{width:64px;padding:5px 8px;background:var(--surface2);
+  border:1px solid var(--border);border-radius:7px;color:var(--text);
+  font-size:12px;font-family:inherit;outline:none;text-align:center;}
+
+.device-card{background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--r);margin-bottom:12px;overflow:hidden;transition:border-color .3s}
+.device-card.warning{border-color:rgba(245,158,11,.35)}
+.device-card.danger{border-color:rgba(239,68,68,.45)}
+.dc-head{padding:12px 14px 10px;display:flex;align-items:center;justify-content:space-between}
+.dc-left{display:flex;align-items:center;gap:10px}
+.dev-toggle{width:36px;height:20px;border-radius:10px;background:var(--surface2);
+  border:1px solid var(--border);cursor:pointer;position:relative;transition:background .2s;flex-shrink:0}
+.dev-toggle.on{background:var(--accent);border-color:var(--accent)}
+.dev-toggle::after{content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;
+  border-radius:50%;background:#fff;transition:left .2s;}
+.dev-toggle.on::after{left:18px}
+.dev-name{font-size:14px;font-weight:600}
+.dev-id-edit{display:flex;align-items:center;gap:5px;margin-top:2px}
+.dev-id-edit label{font-size:10px;color:var(--muted);letter-spacing:.04em}
+.dev-id-edit input{background:transparent;border:none;border-bottom:1px dashed var(--border);
+  color:var(--warn);font-size:12px;font-family:inherit;outline:none;width:90px;padding:1px 2px;}
+.dev-id-edit input:focus{border-bottom-color:var(--warn)}
+.badge{font-size:10px;font-weight:600;padding:3px 9px;border-radius:20px;
+  text-transform:uppercase;letter-spacing:.4px;}
+.badge.normal{background:rgba(0,212,170,.12);color:var(--accent)}
+.badge.warning{background:rgba(245,158,11,.12);color:var(--warn)}
+.badge.danger{background:rgba(239,68,68,.12);color:var(--danger)}
+.badge.off{background:var(--surface2);color:var(--muted)}
+
+.sensors{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--border)}
+.sensor-cell{padding:10px 8px 12px;text-align:center;border-right:1px solid var(--border)}
+.sensor-cell:last-child{border-right:none}
+.sensor-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;
+  color:var(--muted);margin-bottom:5px}
+.sensor-val{font-size:21px;font-weight:600;font-variant-numeric:tabular-nums}
+.sensor-unit{font-size:10px;color:var(--muted);margin-left:1px}
+.val-t{color:var(--warn)} .val-h{color:#4a9eff} .val-c{color:#a78bfa}
+
+.dc-footer{padding:6px 14px 10px;display:flex;align-items:center;justify-content:space-between}
+.published-topic{font-size:10px;color:var(--muted);font-family:'SF Mono',monospace;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:75%}
+.published-topic b{color:var(--accent)}
+.pub-count{font-size:10px;color:var(--muted);flex-shrink:0}
+
+/* Scenario buttons */
+.scenarios{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;
+  scrollbar-width:none;margin-bottom:4px}
+.scenarios::-webkit-scrollbar{display:none}
+.scen{flex-shrink:0;font-size:12px;font-weight:500;padding:6px 14px;
+  border-radius:20px;cursor:pointer;border:1px solid var(--border);
+  background:var(--surface);color:var(--muted);white-space:nowrap;transition:all .2s;font-family:inherit}
+.scen.d{border-color:rgba(239,68,68,.4);color:var(--danger)}
+.scen.w{border-color:rgba(245,158,11,.4);color:var(--warn)}
+.scen.g{border-color:rgba(0,212,170,.4);color:var(--accent)}
+
+/* Log */
+.log-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
+  padding:14px;max-height:160px;overflow-y:auto;font-size:11px;
+  font-family:'SF Mono',Menlo,monospace;color:var(--muted);line-height:1.7}
+.log-box .ok{color:var(--accent)} .log-box .er{color:var(--danger)} .log-box .in{color:#4a9eff}
+
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+  background:var(--surface2);border:1px solid var(--border);border-radius:12px;
+  padding:9px 18px;font-size:13px;z-index:999;pointer-events:none;
+  opacity:0;transition:opacity .3s;white-space:nowrap;}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">IoT <span>Publisher</span></div>
+  <div class="conn-pill" id="conn-pill"><span class="cdot"></span><span id="conn-label">Disconnected</span></div>
+</nav>
+
+<main>
+  <!-- MQTT Config -->
+  <div class="card">
+    <div class="card-title">MQTT Broker</div>
+    <div class="row">
+      <div class="field"><label>Host</label>
+        <input id="cfg-host" placeholder="xxxx.s1.eu.hivemq.cloud" autocomplete="off"/></div>
+      <div class="field"><label>Port (WSS)</label>
+        <input id="cfg-port" value="8884" type="number"/></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>Username</label>
+        <input id="cfg-user" autocomplete="off"/></div>
+      <div class="field"><label>Password</label>
+        <input id="cfg-pass" type="password" autocomplete="off"/></div>
+    </div>
+    <div class="row single">
+      <div class="field"><label>Topic Prefix &amp; X (device suffix)</label>
+        <input id="cfg-prefix" value="home/sensors" placeholder="home/sensors"/></div>
+    </div>
+    <div class="topic-preview" id="topic-preview">
+      Topics will publish to: <b id="tp-prefix">home/sensors</b>/<span class="x">{x}</span>/temperature, …/humidity, …/co2, …/json
+    </div>
+    <button class="btn btn-connect" id="connect-btn" onclick="toggleConnect()">Connect</button>
+  </div>
+
+  <!-- Scenario injectors -->
+  <div class="card" style="padding:14px 18px">
+    <div class="card-title" style="margin-bottom:10px">Inject Scenario</div>
+    <div class="scenarios">
+      <button class="scen d" onclick="injectScenario('co2')">💨 CO₂ Spike</button>
+      <button class="scen d" onclick="injectScenario('temp')">🌡 Temp Danger</button>
+      <button class="scen w" onclick="injectScenario('hum')">💧 High Humidity</button>
+      <button class="scen g" onclick="injectScenario('reset')">✅ Reset All</button>
+    </div>
+  </div>
+
+  <!-- Devices -->
+  <div>
+    <div class="dev-header">
+      <h2>Virtual Devices</h2>
+      <div class="interval-row">
+        Publish every
+        <input id="interval-input" value="2" min="1" max="60" type="number" onchange="updateInterval()"/>
+        s
+      </div>
+    </div>
+    <div id="devices-container"></div>
+  </div>
+
+  <!-- Log -->
+  <div class="card" style="padding:14px">
+    <div class="card-title" style="margin-bottom:8px">Publish Log</div>
+    <div class="log-box" id="log-box"><span class="in">Waiting for connection…</span></div>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── State ───────────────────────────────────────────────────────────────
+let mqttClient = null;
+let publishInterval = null;
+let publishCounts = {};
+
+const DEVICES = [
+  { id: 'room-a',       name: 'Lab Room A',   x: 'room-a'   },
+  { id: 'server-room',  name: 'Server Room',  x: 'server'   },
+  { id: 'greenhouse',   name: 'Greenhouse B', x: 'greenhouse'},
+];
+
+const state = {};
+DEVICES.forEach(d => {
+  state[d.id] = { temperature: 22 + Math.random()*5, humidity: 55 + Math.random()*15, co2: 450 + Math.random()*150, enabled: true, status: 'normal' };
+  publishCounts[d.id] = 0;
+});
+
+const THRESH = { temperature:{warn:28,danger:35}, humidity:{warn:70,danger:85}, co2:{warn:800,danger:1200} };
+
+function getStatus(s) {
+  if (s.temperature>THRESH.temperature.danger||s.humidity>THRESH.humidity.danger||s.co2>THRESH.co2.danger) return 'danger';
+  if (s.temperature>THRESH.temperature.warn||s.humidity>THRESH.humidity.warn||s.co2>THRESH.co2.warn) return 'warning';
+  return 'normal';
+}
+
+function walk(v, min, max, step) { return Math.min(max, Math.max(min, v + (Math.random()-0.5)*step)); }
+
+// ── Render ───────────────────────────────────────────────────────────────
+function getPrefix() { return document.getElementById('cfg-prefix').value.trim() || 'home/sensors'; }
+function getX(device) {
+  const el = document.getElementById(`x-${device.id}`);
+  return (el ? el.value.trim() : device.x) || device.x;
+}
+
+document.getElementById('cfg-prefix').addEventListener('input', () => {
+  document.getElementById('tp-prefix').textContent = getPrefix();
+  DEVICES.forEach(d => updateFooter(d));
+});
+
+function buildDeviceCards() {
+  const container = document.getElementById('devices-container');
+  container.innerHTML = '';
+  DEVICES.forEach(d => {
+    const s = state[d.id];
+    const card = document.createElement('div');
+    card.className = 'device-card';
+    card.id = `card-${d.id}`;
+    card.innerHTML = `
+      <div class="dc-head">
+        <div class="dc-left">
+          <div class="dev-toggle on" id="toggle-${d.id}" onclick="toggleDevice('${d.id}')"></div>
+          <div>
+            <div class="dev-name">${d.name}</div>
+            <div class="dev-id-edit">
+              <label>X =</label>
+              <input id="x-${d.id}" value="${d.x}" onchange="updateFooter(${JSON.stringify(d)})" title="Topic suffix — publishes to prefix/X/..."/>
+            </div>
+          </div>
+        </div>
+        <span class="badge normal" id="badge-${d.id}">Normal</span>
+      </div>
+      <div class="sensors">
+        <div class="sensor-cell">
+          <div class="sensor-label">Temp</div>
+          <div><span class="sensor-val val-t" id="tv-${d.id}">--</span><span class="sensor-unit">°C</span></div>
+        </div>
+        <div class="sensor-cell">
+          <div class="sensor-label">Humid</div>
+          <div><span class="sensor-val val-h" id="hv-${d.id}">--</span><span class="sensor-unit">%</span></div>
+        </div>
+        <div class="sensor-cell">
+          <div class="sensor-label">CO₂</div>
+          <div><span class="sensor-val val-c" id="cv-${d.id}">--</span><span class="sensor-unit">ppm</span></div>
+        </div>
+      </div>
+      <div class="dc-footer">
+        <span class="published-topic" id="ft-${d.id}">—</span>
+        <span class="pub-count" id="pc-${d.id}">0 msgs</span>
+      </div>`;
+    container.appendChild(card);
+    updateFooter(d);
+    refreshCard(d.id);
+  });
+}
+
+function refreshCard(id) {
+  const s = state[id];
+  const el = t => document.getElementById(t);
+  if (!el(`tv-${id}`)) return;
+  s.status = getStatus(s);
+  el(`card-${id}`).className = `device-card ${s.status}`;
+  el(`badge-${id}`).className = `badge ${s.enabled ? s.status : 'off'}`;
+  el(`badge-${id}`).textContent = s.enabled ? s.status.charAt(0).toUpperCase()+s.status.slice(1) : 'Off';
+  el(`tv-${id}`).textContent = s.temperature.toFixed(1);
+  el(`hv-${id}`).textContent = s.humidity.toFixed(1);
+  el(`cv-${id}`).textContent = Math.round(s.co2);
+  el(`toggle-${id}`).className = `dev-toggle${s.enabled?' on':''}`;
+  el(`pc-${id}`).textContent = publishCounts[id] + ' msgs';
+}
+
+function updateFooter(d) {
+  const el = document.getElementById(`ft-${d.id}`);
+  if (el) el.innerHTML = `<b>${getPrefix()}</b>/<span style="color:var(--warn)">${getX(d)}</span>/…`;
+}
+
+function toggleDevice(id) {
+  state[id].enabled = !state[id].enabled;
+  refreshCard(id);
+}
+
+// ── MQTT ─────────────────────────────────────────────────────────────────
+function toggleConnect() {
+  if (mqttClient && mqttClient.connected) disconnect();
+  else connect();
+}
+
+function connect() {
+  const host   = document.getElementById('cfg-host').value.trim();
+  const port   = parseInt(document.getElementById('cfg-port').value) || 8884;
+  const user   = document.getElementById('cfg-user').value.trim();
+  const pass   = document.getElementById('cfg-pass').value;
+
+  if (!host) { showToast('Enter HiveMQ host first'); return; }
+
+  const btn = document.getElementById('connect-btn');
+  btn.disabled = true; btn.textContent = 'Connecting…';
+  setPill('connecting');
+
+  const url = `wss://${host}:${port}/mqtt`;
+  log(`Connecting to ${url}…`, 'in');
+
+  mqttClient = mqtt.connect(url, {
+    username: user, password: pass,
+    clientId: 'iot-sim-' + Math.random().toString(16).slice(2,8),
+    rejectUnauthorized: false,
+    keepalive: 30,
+  });
+
+  mqttClient.on('connect', () => {
+    setPill('on');
+    btn.disabled = false; btn.textContent = 'Disconnect';
+    btn.className = 'btn btn-disconnect';
+    log('Connected ✓', 'ok');
+    showToast('Connected to HiveMQ ✓');
+    startPublishing();
+  });
+
+  mqttClient.on('error', err => {
+    setPill('err');
+    btn.disabled = false; btn.textContent = 'Retry';
+    btn.className = 'btn btn-connect';
+    log('Error: ' + err.message, 'er');
+  });
+
+  mqttClient.on('close', () => {
+    setPill('');
+    stopPublishing();
+    btn.disabled = false; btn.textContent = 'Connect';
+    btn.className = 'btn btn-connect';
+  });
+}
+
+function disconnect() {
+  mqttClient?.end(true);
+  stopPublishing();
+  setPill('');
+  const btn = document.getElementById('connect-btn');
+  btn.textContent = 'Connect'; btn.className = 'btn btn-connect';
+  log('Disconnected', 'in');
+}
+
+function setPill(state) {
+  const pill = document.getElementById('conn-pill');
+  const label = document.getElementById('conn-label');
+  pill.className = 'conn-pill' + (state==='on'?' on':state==='err'?' err':'');
+  label.textContent = state==='on' ? 'Connected' : state==='err' ? 'Error' : state==='connecting' ? 'Connecting…' : 'Disconnected';
+}
+
+// ── Publish loop ─────────────────────────────────────────────────────────
+function startPublishing() {
+  stopPublishing();
+  const ms = (parseInt(document.getElementById('interval-input').value)||2) * 1000;
+  publishAll();
+  publishInterval = setInterval(publishAll, ms);
+}
+
+function stopPublishing() {
+  if (publishInterval) { clearInterval(publishInterval); publishInterval = null; }
+}
+
+function updateInterval() {
+  if (mqttClient?.connected) startPublishing();
+}
+
+function publishAll() {
+  const prefix = getPrefix();
+  DEVICES.forEach(d => {
+    const s = state[d.id];
+    if (!s.enabled) return;
+    // Random walk
+    s.temperature = walk(s.temperature, 15, 40, 0.8);
+    s.humidity    = walk(s.humidity, 20, 95, 1.2);
+    s.co2         = walk(s.co2, 300, 1500, 15);
+    s.status      = getStatus(s);
+    refreshCard(d.id);
+
+    const x = getX(d);
+    const base = `${prefix}/${x}`;
+    const payload = {
+      deviceId: d.id, name: d.name, x,
+      timestamp: new Date().toISOString(),
+      temperature: +s.temperature.toFixed(1),
+      humidity: +s.humidity.toFixed(1),
+      co2: Math.round(s.co2),
+      status: s.status,
+    };
+
+    mqttClient.publish(`${base}/temperature`, String(payload.temperature), {qos:0,retain:false});
+    mqttClient.publish(`${base}/humidity`,    String(payload.humidity),    {qos:0,retain:false});
+    mqttClient.publish(`${base}/co2`,         String(payload.co2),         {qos:0,retain:false});
+    mqttClient.publish(`${base}/status`,      payload.status,              {qos:0,retain:false});
+    mqttClient.publish(`${base}/json`,        JSON.stringify(payload),     {qos:0,retain:false});
+
+    publishCounts[d.id]++;
+    document.getElementById(`pc-${d.id}`).textContent = publishCounts[d.id] + ' msgs';
+  });
+
+  const active = DEVICES.filter(d => state[d.id].enabled).length;
+  if (active > 0) log(`Published ${active} device(s) @ ${new Date().toLocaleTimeString()}`, 'ok');
+}
+
+// ── Scenarios ─────────────────────────────────────────────────────────────
+function injectScenario(name) {
+  if (name==='co2')   { state['room-a'].co2 = 1450; showToast('💨 CO₂ spike injected on Room A'); }
+  if (name==='temp')  { state['server-room'].temperature = 38.5; showToast('🌡 Temp danger on Server Room'); }
+  if (name==='hum')   { state['greenhouse'].humidity = 93; showToast('💧 High humidity on Greenhouse'); }
+  if (name==='reset') {
+    DEVICES.forEach(d => {
+      state[d.id].temperature = 22 + Math.random()*4;
+      state[d.id].humidity    = 55 + Math.random()*10;
+      state[d.id].co2         = 450 + Math.random()*100;
+    });
+    showToast('✅ All devices reset');
+  }
+  DEVICES.forEach(d => refreshCard(d.id));
+}
+
+// ── Log ───────────────────────────────────────────────────────────────────
+let logCount = 0;
+function log(msg, type='') {
+  const box = document.getElementById('log-box');
+  if (logCount === 0) box.innerHTML = '';
+  const line = document.createElement('div');
+  line.className = type;
+  line.textContent = msg;
+  box.prepend(line);
+  logCount++;
+  if (logCount > 60) box.lastElementChild?.remove();
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────
+buildDeviceCards();
+</script>
+</body>
+</html>
