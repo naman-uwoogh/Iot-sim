@@ -127,6 +127,14 @@ main{padding:16px;max-width:540px;margin:0 auto}
   padding:9px 18px;font-size:13px;z-index:999;pointer-events:none;
   opacity:0;transition:opacity .3s;white-space:nowrap;}
 .toast.show{opacity:1}
+  .sub-topic-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  border-top: 1px solid var(--border);
+  background: rgba(255,255,255,0.02);
+  }
 </style>
 </head>
 <body>
@@ -238,37 +246,45 @@ function buildDeviceCards() {
     card.className = 'device-card';
     card.id = `card-${d.id}`;
     card.innerHTML = `
-      <div class="dc-head">
-        <div class="dc-left">
-          <div class="dev-toggle on" id="toggle-${d.id}" onclick="toggleDevice('${d.id}')"></div>
-          <div>
-            <div class="dev-name">${d.name}</div>
-            <div class="dev-id-edit">
-              <label>X =</label>
-              <input id="x-${d.id}" value="${d.x}" onchange="updateFooter(${JSON.stringify(d)})" title="Topic suffix — publishes to prefix/X/..."/>
-            </div>
-          </div>
-        </div>
-        <span class="badge normal" id="badge-${d.id}">Normal</span>
+  
+<div class="dc-head">
+  <div class="dc-left">
+    <div class="dev-toggle on" id="toggle-${d.id}" onclick="toggleDevice('${d.id}')"></div>
+    <div>
+  
+      <div class="dev-id-edit" style="margin-bottom:3px">
+        <label style="font-size:10px;color:var(--muted)">NAME</label>
+        <input id="name-${d.id}" value="${d.name}"
+          style="color:var(--accent);width:110px"
+          onchange="updateFooter(${JSON.stringify(d)})"
+          title="Display name for this device"/>
       </div>
-      <div class="sensors">
-        <div class="sensor-cell">
-          <div class="sensor-label">Temp</div>
-          <div><span class="sensor-val val-t" id="tv-${d.id}">--</span><span class="sensor-unit">°C</span></div>
-        </div>
-        <div class="sensor-cell">
-          <div class="sensor-label">Humid</div>
-          <div><span class="sensor-val val-h" id="hv-${d.id}">--</span><span class="sensor-unit">%</span></div>
-        </div>
-        <div class="sensor-cell">
-          <div class="sensor-label">CO₂</div>
-          <div><span class="sensor-val val-c" id="cv-${d.id}">--</span><span class="sensor-unit">ppm</span></div>
-        </div>
+  
+      <div class="dev-id-edit">
+        <label>X =</label>
+        <input id="x-${d.id}" value="${d.x}"
+          onchange="updateFooter(${JSON.stringify(d)})"
+          title="Topic suffix — publishes to prefix/X/…"/>
       </div>
-      <div class="dc-footer">
-        <span class="published-topic" id="ft-${d.id}">—</span>
-        <span class="pub-count" id="pc-${d.id}">0 msgs</span>
-      </div>`;
+    </div>
+  </div>
+  <span class="badge normal" id="badge-${d.id}">Normal</span>
+</div>
+<div class="sub-topic-row" id="sub-row-${d.id}">
+  <span style="font-size:10px;color:var(--muted);text-transform:uppercase;
+    letter-spacing:.06em;flex-shrink:0">Subscribe to</span>
+  <input id="sub-${d.id}" 
+    value="${getPrefix()}/${d.x}/#"
+    style="flex:1;background:var(--surface2);border:1px solid var(--border);
+      border-radius:7px;padding:4px 9px;color:var(--text);font-size:11px;
+      font-family:'SF Mono',monospace;outline:none;min-width:0"
+    title="MQTT topic to subscribe to (for reference / your app)"/>
+  <button onclick="copyTopic('${d.id}')" 
+    style="background:var(--surface2);border:1px solid var(--border);
+      border-radius:7px;padding:4px 8px;color:var(--muted);cursor:pointer;
+      font-size:11px;flex-shrink:0">Copy</button>
+</div>
+      `;
     container.appendChild(card);
     updateFooter(d);
     refreshCard(d.id);
@@ -454,6 +470,23 @@ function showToast(msg) {
 }
 
 buildDeviceCards();
+  function copyTopic(id) {
+  const val = document.getElementById(`sub-${id}`).value;
+  navigator.clipboard.writeText(val).then(() => showToast('Topic copied ✓'));
+}
+
+function updateFooter(d) {
+  const prefix = getPrefix();
+  const x = getX(d);
+
+  const ft = document.getElementById(`ft-${d.id}`);
+  if (ft) ft.innerHTML = `<b>${prefix}</b>/<span style="color:var(--warn)">${x}</span>/…`;
+
+  const subEl = document.getElementById(`sub-${d.id}`);
+  if (subEl && !subEl.dataset.manualEdit) {
+    subEl.value = `${prefix}/${x}/#`;
+  }
+}
 </script>
 </body>
 </html>
