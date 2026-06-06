@@ -11,7 +11,7 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
-  --bg:#0f1117;--surface:#1a1d27;--surface2:#22263a;
+  --bg:#0f1117;--surface:#1a1d25;--surface2:#22263a;
   --border:rgba(255,255,255,0.08);--text:#e8eaf0;--muted:#8890a8;
   --accent:#00d4aa;--warn:#f59e0b;--danger:#ef4444;--r:14px;
 }
@@ -35,7 +35,6 @@ nav{position:sticky;top:0;z-index:100;background:rgba(15,17,23,0.92);
 
 main{padding:16px;max-width:540px;margin:0 auto}
 
-/* Config card */
 .card{background:var(--surface);border:1px solid var(--border);
   border-radius:var(--r);padding:18px;margin-bottom:14px;}
 .card-title{font-size:13px;font-weight:600;letter-spacing:.04em;
@@ -56,13 +55,11 @@ main{padding:16px;max-width:540px;margin:0 auto}
 .btn-connect:disabled{opacity:.4;cursor:not-allowed}
 .btn-disconnect{background:var(--surface2);color:var(--danger);border:1px solid rgba(239,68,68,.3)}
 
-/* Topic prefix + X display */
 .topic-preview{background:var(--surface2);border-radius:8px;padding:10px 12px;
   font-size:12px;color:var(--muted);margin-top:10px;line-height:1.8}
 .topic-preview b{color:var(--accent)}
 .topic-preview .x{color:var(--warn)}
 
-/* Devices */
 .dev-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
 .dev-header h2{font-size:15px;font-weight:600}
 .interval-row{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
@@ -110,7 +107,6 @@ main{padding:16px;max-width:540px;margin:0 auto}
 .published-topic b{color:var(--accent)}
 .pub-count{font-size:10px;color:var(--muted);flex-shrink:0}
 
-/* Scenario buttons */
 .scenarios{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;
   scrollbar-width:none;margin-bottom:4px}
 .scenarios::-webkit-scrollbar{display:none}
@@ -121,7 +117,6 @@ main{padding:16px;max-width:540px;margin:0 auto}
 .scen.w{border-color:rgba(245,158,11,.4);color:var(--warn)}
 .scen.g{border-color:rgba(0,212,170,.4);color:var(--accent)}
 
-/* Log */
 .log-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
   padding:14px;max-height:160px;overflow-y:auto;font-size:11px;
   font-family:'SF Mono',Menlo,monospace;color:var(--muted);line-height:1.7}
@@ -142,7 +137,7 @@ main{padding:16px;max-width:540px;margin:0 auto}
 </nav>
 
 <main>
-  <!-- MQTT Config -->
+  
   <div class="card">
     <div class="card-title">MQTT Broker</div>
     <div class="row">
@@ -166,19 +161,16 @@ main{padding:16px;max-width:540px;margin:0 auto}
     </div>
     <button class="btn btn-connect" id="connect-btn" onclick="toggleConnect()">Connect</button>
   </div>
-
-  <!-- Scenario injectors -->
   <div class="card" style="padding:14px 18px">
     <div class="card-title" style="margin-bottom:10px">Inject Scenario</div>
     <div class="scenarios">
-      <button class="scen d" onclick="injectScenario('co2')">💨 CO₂ Spike</button>
-      <button class="scen d" onclick="injectScenario('temp')">🌡 Temp Danger</button>
-      <button class="scen w" onclick="injectScenario('hum')">💧 High Humidity</button>
-      <button class="scen g" onclick="injectScenario('reset')">✅ Reset All</button>
+      <button class="scen d" onclick="injectScenario('co2')">CO₂ Spike</button>
+      <button class="scen d" onclick="injectScenario('temp')">Temp Danger</button>
+      <button class="scen w" onclick="injectScenario('hum')">High Humidity</button>
+      <button class="scen g" onclick="injectScenario('reset')">Reset All</button>
     </div>
   </div>
-
-  <!-- Devices -->
+  
   <div>
     <div class="dev-header">
       <h2>Virtual Devices</h2>
@@ -191,7 +183,6 @@ main{padding:16px;max-width:540px;margin:0 auto}
     <div id="devices-container"></div>
   </div>
 
-  <!-- Log -->
   <div class="card" style="padding:14px">
     <div class="card-title" style="margin-bottom:8px">Publish Log</div>
     <div class="log-box" id="log-box"><span class="in">Waiting for connection…</span></div>
@@ -201,7 +192,6 @@ main{padding:16px;max-width:540px;margin:0 auto}
 <div class="toast" id="toast"></div>
 
 <script>
-// ── State ───────────────────────────────────────────────────────────────
 let mqttClient = null;
 let publishInterval = null;
 let publishCounts = {};
@@ -228,7 +218,6 @@ function getStatus(s) {
 
 function walk(v, min, max, step) { return Math.min(max, Math.max(min, v + (Math.random()-0.5)*step)); }
 
-// ── Render ───────────────────────────────────────────────────────────────
 function getPrefix() { return document.getElementById('cfg-prefix').value.trim() || 'home/sensors'; }
 function getX(device) {
   const el = document.getElementById(`x-${device.id}`);
@@ -311,7 +300,6 @@ function toggleDevice(id) {
   refreshCard(id);
 }
 
-// ── MQTT ─────────────────────────────────────────────────────────────────
 function toggleConnect() {
   if (mqttClient && mqttClient.connected) disconnect();
   else connect();
@@ -343,7 +331,7 @@ function connect() {
     setPill('on');
     btn.disabled = false; btn.textContent = 'Disconnect';
     btn.className = 'btn btn-disconnect';
-    log('Connected ✓', 'ok');
+    log('Connected', 'ok');
     showToast('Connected to HiveMQ ✓');
     startPublishing();
   });
@@ -379,7 +367,6 @@ function setPill(state) {
   label.textContent = state==='on' ? 'Connected' : state==='err' ? 'Error' : state==='connecting' ? 'Connecting…' : 'Disconnected';
 }
 
-// ── Publish loop ─────────────────────────────────────────────────────────
 function startPublishing() {
   stopPublishing();
   const ms = (parseInt(document.getElementById('interval-input').value)||2) * 1000;
@@ -432,23 +419,21 @@ function publishAll() {
   if (active > 0) log(`Published ${active} device(s) @ ${new Date().toLocaleTimeString()}`, 'ok');
 }
 
-// ── Scenarios ─────────────────────────────────────────────────────────────
 function injectScenario(name) {
-  if (name==='co2')   { state['room-a'].co2 = 1450; showToast('💨 CO₂ spike injected on Room A'); }
-  if (name==='temp')  { state['server-room'].temperature = 38.5; showToast('🌡 Temp danger on Server Room'); }
-  if (name==='hum')   { state['greenhouse'].humidity = 93; showToast('💧 High humidity on Greenhouse'); }
+  if (name==='co2')   { state['room-a'].co2 = 1450; showToast('CO₂ spike injected on Room A'); }
+  if (name==='temp')  { state['server-room'].temperature = 38.5; showToast('Temp danger on Server Room'); }
+  if (name==='hum')   { state['greenhouse'].humidity = 93; showToast('High humidity on Greenhouse'); }
   if (name==='reset') {
     DEVICES.forEach(d => {
       state[d.id].temperature = 22 + Math.random()*4;
       state[d.id].humidity    = 55 + Math.random()*10;
       state[d.id].co2         = 450 + Math.random()*100;
     });
-    showToast('✅ All devices reset');
+    showToast(' All devices reset');
   }
   DEVICES.forEach(d => refreshCard(d.id));
 }
 
-// ── Log ───────────────────────────────────────────────────────────────────
 let logCount = 0;
 function log(msg, type='') {
   const box = document.getElementById('log-box');
@@ -461,14 +446,13 @@ function log(msg, type='') {
   if (logCount > 60) box.lastElementChild?.remove();
 }
 
-// ── Toast ─────────────────────────────────────────────────────────────────
+
 function showToast(msg) {
   const t = document.getElementById('toast');
   t.textContent = msg; t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 2500);
 }
 
-// ── Init ──────────────────────────────────────────────────────────────────
 buildDeviceCards();
 </script>
 </body>
